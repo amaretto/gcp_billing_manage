@@ -113,8 +113,8 @@ func getBilling(ctx context.Context, projectID string) ([]Billing, error) {
 
 func postBillingToGss(billingInfo []Billing) error {
 	// ToDo : use environment value
-	tokenPath := os.Getenv("TOKEN_PATH")
-	b, err := ioutil.ReadFile(tokenPath)
+	credentialPath := os.Getenv("CREDENTIAL_PATH")
+	b, err := ioutil.ReadFile(credentialPath)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
