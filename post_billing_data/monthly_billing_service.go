@@ -23,6 +23,7 @@ import (
 type Billing struct {
 	Month   string
 	Project string
+	Service string
 	Total   float64
 }
 
@@ -50,15 +51,16 @@ func getBilling(ctx context.Context, projectID string) ([]Billing, error) {
 
 	q := client.Query(`
 		SELECT
-			invoice.month as month,
-			IFNULL(project.name, "TAX") as project,
+			invoice.month AS month,
+			IFNULL(project.name, "TAX") AS project,
+			service.description AS service,
 			(SUM(CAST(cost * 1000000 AS int64))
 			+ SUM(IFNULL((SELECT SUM(CAST(c.amount * 1000000 as int64))
 		FROM UNNEST(credits) c), 0))) / 1000000
 		AS total
 		FROM ` + os.Getenv("BILLING_BQ_TBL") + `
-		GROUP BY month, project
-		ORDER BY month, project  ASC
+		GROUP BY month, project, service
+		ORDER BY month, project, service  ASC
 	`)
 
 	it, err := q.Read(ctx)
@@ -105,7 +107,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 	spreadsheetID := os.Getenv("GSS_ID")
 
 	// ToDo : use valuable for sheet name
-	exists, err := sheetExists(ctx, "monthly_billing")
+	exists, err := sheetExists(ctx, "monthly_billing_service")
 	if err != nil {
 		log.Fatalf("Unable to check Sheets existance: %v", err)
 	}
@@ -129,7 +131,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 		req := sheets.Request{
 			AddSheet: &sheets.AddSheetRequest{
 				Properties: &sheets.SheetProperties{
-					Title:          "monthly_billing",
+					Title:          "monthly_billing_service",
 					GridProperties: gridProperties,
 					TabColor:       tabColor,
 				},
@@ -145,7 +147,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 			log.Fatalf("Unable to batch update from sheet. %v", err)
 		}
 
-		sheetID, err = getSheetID(ctx, "monthly_billing")
+		sheetID, err = getSheetID(ctx, "monthly_billing_service")
 		if err != nil {
 			log.Fatalf("Unable to get created sheet ID. %v", err)
 		}
@@ -159,7 +161,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 					StartRowIndex:    1,
 					EndRowIndex:      2,
 					StartColumnIndex: 1,
-					EndColumnIndex:   4,
+					EndColumnIndex:   5,
 				},
 				Cell: &sheets.CellData{
 					UserEnteredFormat: &sheets.CellFormat{
@@ -192,14 +194,14 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 		}
 
 		// set header values
-		hv := [][]interface{}{[]interface{}{"Month", "Project", "Total"}}
+		hv := [][]interface{}{[]interface{}{"Month", "Project", "Service", "Total"}}
 		hvr := &sheets.ValueRange{
 			MajorDimension: "ROWS",
 			Values:         hv,
 		}
 
 		// ToDo : use valuable
-		_, err = srv.Spreadsheets.Values.Update(spreadsheetID, "monthly_billing!B2:D2", hvr).ValueInputOption("USER_ENTERED").Do()
+		_, err = srv.Spreadsheets.Values.Update(spreadsheetID, "monthly_billing_service!B2:E2", hvr).ValueInputOption("USER_ENTERED").Do()
 		if err != nil {
 			log.Fatalf("Unable to write value. %v", err)
 		}
@@ -210,7 +212,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 	values := make([][]interface{}, len(billingInfo))
 
 	for i, billing := range billingInfo {
-		values[i] = []interface{}{billing.Month, billing.Project, billing.Total}
+		values[i] = []interface{}{billing.Month, billing.Project, billing.Service, billing.Total}
 	}
 
 	valueRange := &sheets.ValueRange{
@@ -219,14 +221,14 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 	}
 
 	// ToDo : Change code adopt changing billing info columns
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, "monthly_billing!B3:d1000", valueRange).ValueInputOption("USER_ENTERED").Do()
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, "monthly_billing_service!B3:E1000", valueRange).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
 		log.Fatalf("Unable to write value. %v", err)
 	}
 
 	// ToDo : change SheetId
 	if sheetID == -1 {
-		sheetID, err = getSheetID(ctx, "monthly_billing")
+		sheetID, err = getSheetID(ctx, "monthly_billing_service")
 		if err != nil {
 			log.Fatalf("Unable to get created sheet ID. %v", err)
 		}
@@ -236,7 +238,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 		StartRowIndex:    2,
 		EndRowIndex:      1000,
 		StartColumnIndex: 1,
-		EndColumnIndex:   4,
+		EndColumnIndex:   5,
 	}
 
 	borderColor := &sheets.Color{
