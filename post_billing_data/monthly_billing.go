@@ -103,9 +103,10 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 	}
 
 	spreadsheetID := os.Getenv("GSS_ID")
+	targetSheetName := "monthly_billing"
 
 	// ToDo : use valuable for sheet name
-	exists, err := sheetExists(ctx, "monthly_billing")
+	exists, err := sheetExists(ctx, targetSheetName)
 	if err != nil {
 		log.Fatalf("Unable to check Sheets existance: %v", err)
 	}
@@ -129,7 +130,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 		req := sheets.Request{
 			AddSheet: &sheets.AddSheetRequest{
 				Properties: &sheets.SheetProperties{
-					Title:          "monthly_billing",
+					Title:          targetSheetName,
 					GridProperties: gridProperties,
 					TabColor:       tabColor,
 				},
@@ -145,7 +146,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 			log.Fatalf("Unable to batch update from sheet. %v", err)
 		}
 
-		sheetID, err = getSheetID(ctx, "monthly_billing")
+		sheetID, err = getSheetID(ctx, targetSheetName)
 		if err != nil {
 			log.Fatalf("Unable to get created sheet ID. %v", err)
 		}
@@ -159,7 +160,7 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 					StartRowIndex:    1,
 					EndRowIndex:      2,
 					StartColumnIndex: 1,
-					EndColumnIndex:   4,
+					EndColumnIndex:   10,
 				},
 				Cell: &sheets.CellData{
 					UserEnteredFormat: &sheets.CellFormat{
@@ -190,51 +191,70 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 		if err != nil {
 			log.Fatalf("Unable to batch update from sheet. %v", err)
 		}
+	}
 
-		// set header values
-		hv := [][]interface{}{[]interface{}{"Month", "Project", "Total"}}
-		hvr := &sheets.ValueRange{
-			MajorDimension: "ROWS",
-			Values:         hv,
+	//values := make([][]interface{}, len(billingInfo))
+	// create project map,index and month map, index
+	prjMap := make(map[string]int)
+	prjIdx := 1
+	mnthMap := make(map[string]int)
+	mnthIdx := 1
+
+	for _, billing := range billingInfo {
+		//values[i] = []interface{}{billing.Month, billing.Project, billing.Total}
+		if prjMap[billing.Project] == 0 {
+			prjMap[billing.Project] = prjIdx
+			prjIdx++
 		}
-
-		// ToDo : use valuable
-		_, err = srv.Spreadsheets.Values.Update(spreadsheetID, "monthly_billing!B2:D2", hvr).ValueInputOption("USER_ENTERED").Do()
-		if err != nil {
-			log.Fatalf("Unable to write value. %v", err)
+		if mnthMap[billing.Month] == 0 {
+			mnthMap[billing.Month] = mnthIdx
+			mnthIdx++
 		}
 
 	}
 
-	// ToDo : Copy value from Bigquery
-	values := make([][]interface{}, len(billingInfo))
+	// make 2 dimention slice
+	nums := make([][]interface{}, len(prjMap)+1)
+	for i := 0; i < len(prjMap)+1; i++ {
+		nums[i] = make([]interface{}, len(mnthMap)+1)
+	}
+	// x header
+	nums[0][0] = "Project"
+	for prj, idx := range prjMap {
+		nums[idx][0] = prj
+	}
+	// y header
+	for mnth, idx := range mnthMap {
+		nums[0][idx] = mnth
+	}
 
-	for i, billing := range billingInfo {
-		values[i] = []interface{}{billing.Month, billing.Project, billing.Total}
+	for _, billing := range billingInfo {
+		nums[prjMap[billing.Project]][mnthMap[billing.Month]] = billing.Total
 	}
 
 	valueRange := &sheets.ValueRange{
 		MajorDimension: "ROWS",
-		Values:         values,
+		Values:         nums,
 	}
 
 	// ToDo : Change code adopt changing billing info columns
-	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, "monthly_billing!B3:d1000", valueRange).ValueInputOption("USER_ENTERED").Do()
+	_, err = srv.Spreadsheets.Values.Update(spreadsheetID, targetSheetName+"!B2:J10", valueRange).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
 		log.Fatalf("Unable to write value. %v", err)
 	}
 
-	// ToDo : change SheetId
 	if sheetID == -1 {
-		sheetID, err = getSheetID(ctx, "monthly_billing")
+		sheetID, err = getSheetID(ctx, targetSheetName)
 		if err != nil {
 			log.Fatalf("Unable to get created sheet ID. %v", err)
 		}
 	}
+
+	// ToDo : gathering parameters to one struct
 	gridRange := &sheets.GridRange{
 		SheetId:          sheetID,
 		StartRowIndex:    2,
-		EndRowIndex:      1000,
+		EndRowIndex:      10,
 		StartColumnIndex: 1,
 		EndColumnIndex:   4,
 	}
@@ -307,6 +327,7 @@ func sheetExists(ctx context.Context, sheetName string) (bool, error) {
 
 	sps, err = srv.Spreadsheets.Get(spreadsheetID).Ranges(ranges...).IncludeGridData(includeGridData).Context(ctx).Do()
 
+	// ToDo : Refactoring
 	var sheetArray []*sheets.Sheet
 	sheetArray = sps.Sheets
 	var sheet *sheets.Sheet
