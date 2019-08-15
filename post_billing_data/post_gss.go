@@ -1,90 +1,20 @@
-package main
+package billing
 
 import (
+	// google spread sheet
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 
-	// bigquery
-	"cloud.google.com/go/bigquery"
-	"golang.org/x/net/context"
-	"google.golang.org/api/iterator"
-
-	// google spread sheet
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/sheets/v4"
 )
 
-// Billing has billing info from bigquery
-type Billing struct {
-	Month   string
-	Project string
-	Total   float64
-}
-
-func main() {
-	ctx := context.Background()
-	projectID := os.Getenv("BILLING_PROJECT_ID")
-
-	result, err := getBilling(ctx, projectID)
-	if err != nil {
-		// TODO: Handle error.
-	}
-
-	err = postBillingToGss(ctx, result)
-	if err != nil {
-		// TODO: Handle error.
-	}
-}
-
-// ToDo : delete and use external
-// getBilling get billing info from bigquery
-func getBilling(ctx context.Context, projectID string) ([]Billing, error) {
-	client, err := bigquery.NewClient(ctx, projectID)
-	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
-	}
-
-	q := client.Query(`
-		SELECT
-			invoice.month as month,
-			IFNULL(project.name, "TAX") as project,
-			(SUM(CAST(cost * 1000000 AS int64))
-			+ SUM(IFNULL((SELECT SUM(CAST(c.amount * 1000000 as int64))
-		FROM UNNEST(credits) c), 0))) / 1000000
-		AS total
-		FROM ` + os.Getenv("BILLING_BQ_TBL") + `
-		GROUP BY month, project
-		ORDER BY month, project  ASC
-	`)
-
-	it, err := q.Read(ctx)
-	if err != nil {
-		// TODO: Handle error.
-	}
-
-	var billingInfo []Billing
-
-	for {
-		var b Billing
-		err := it.Next(&b)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			// TODO: Handle error.
-		}
-		billingInfo = append(billingInfo, b)
-	}
-
-	return billingInfo, nil
-}
-
-func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
+func PostBilling(ctx context.Context, billingInfo []Billing) error {
 	credentialPath := os.Getenv("CREDENTIAL_PATH")
 	b, err := ioutil.ReadFile(credentialPath)
 	if err != nil {
@@ -390,19 +320,46 @@ func getSheetID(ctx context.Context, sheetName string) (int64, error) {
 	return -1, nil
 }
 
-// --------------auth modules-------------------
-// Retrieve a token, saves the token, then returns the generated client.
-func getClient(config *oauth2.Config) *http.Client {
-	// The file token.json stores the user's access and refresh tokens, and is
-	// created automatically when the authorization flow completes for the first
-	// time.
-	tokFile := "token.json"
-	tok, err := tokenFromFile(tokFile)
-	if err != nil {
-		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
+//---------------------------------------------------------
+// Request a token from the web, then returns the retrieved token.
+func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("Go to the following link in your browser then type the "+
+		"authorization code: \n%v\n", authURL)
+
+	var authCode string
+	if _, err := fmt.Scan(&authCode); err != nil {
+		log.Fatalf("Unable to read authorization code: %v", err)
 	}
-	return config.Client(context.Background(), tok)
+
+	tok, err := config.Exchange(context.TODO(), authCode)
+	if err != nil {
+		log.Fatalf("Unable to retrieve token from web: %v", err)
+	}
+	return tok
+}
+
+// Retrieves a token from a local file.
+func tokenFromFile(file string) (*oauth2.Token, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	tok := &oauth2.Token{}
+	err = json.NewDecoder(f).Decode(tok)
+	return tok, err
+}
+
+// Saves a token to a file path.
+func saveToken(path string, token *oauth2.Token) {
+	fmt.Printf("Saving credential file to: %s\n", path)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		log.Fatalf("Unable to cache oauth token: %v", err)
+	}
+	defer f.Close()
+	json.NewEncoder(f).Encode(token)
 }
 
 // Request a token from the web, then returns the retrieved token.
@@ -445,3 +402,7 @@ func saveToken(path string, token *oauth2.Token) {
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)
 }
+
+// ToDo : implement
+// func postBillingService
+// func postBillingSku
