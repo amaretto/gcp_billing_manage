@@ -11,7 +11,7 @@ import (
 )
 
 // GetBilling get billing info from bigquery
-func GetBilling(ctx context.Context, projectID string) ([]Billing, error) {
+func GetAllBilling(ctx context.Context, projectID string) ([]Billing, error) {
 	client, err := bigquery.NewClient(ctx, projectID)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
@@ -52,5 +52,8 @@ func GetBilling(ctx context.Context, projectID string) ([]Billing, error) {
 }
 
 // ToDo : implement
+// func GetAllBillingService
+// func GetAllBillingSku
+// func GetBilling
 // func GetBillingService
 // func GetBillingSku
