@@ -17,6 +17,10 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/sheets/v4"
+
+	// billing
+	//"github.com/amaretto/gcp_billing_manage/post_billing_data/billing"
+	"github.com/amaretto/gcp_billing_manage/post_billing_data"
 )
 
 // Billing has billing info from bigquery
@@ -153,36 +157,37 @@ func postBillingToGss(ctx context.Context, billingInfo []Billing) error {
 		}
 
 		// Insert Header
-		rcreq := sheets.Request{
-			RepeatCell: &sheets.RepeatCellRequest{
-				Fields: "*",
-				Range: &sheets.GridRange{
-					SheetId:          sheetID, // set sheet ID
-					StartRowIndex:    1,
-					EndRowIndex:      2,
-					StartColumnIndex: 1,
-					EndColumnIndex:   10,
-				},
-				Cell: &sheets.CellData{
-					UserEnteredFormat: &sheets.CellFormat{
-						BackgroundColor: &sheets.Color{
-							Red:   0.5,
-							Green: 0.5,
-							Blue:  1.0,
-						},
-						TextFormat: &sheets.TextFormat{
-							ForegroundColor: &sheets.Color{
-								Red:   1.0,
-								Green: 1.0,
-								Blue:  1.0,
-							},
-							Bold:     true,
-							FontSize: 12,
-						},
-					},
-				},
-			},
-		}
+		rcreq := billing.HEADER_REQUEST(shhetID, 1, 2, 1, 10)
+		//rcreq := sheets.Request{
+		//	RepeatCell: &sheets.RepeatCellRequest{
+		//		Fields: "*",
+		//		Range: &sheets.GridRange{
+		//			SheetId:          sheetID, // set sheet ID
+		//			StartRowIndex:    1,
+		//			EndRowIndex:      2,
+		//			StartColumnIndex: 1,
+		//			EndColumnIndex:   10,
+		//		},
+		//		Cell: &sheets.CellData{
+		//			UserEnteredFormat: &sheets.CellFormat{
+		//				BackgroundColor: &sheets.Color{
+		//					Red:   0.5,
+		//					Green: 0.5,
+		//					Blue:  1.0,
+		//				},
+		//				TextFormat: &sheets.TextFormat{
+		//					ForegroundColor: &sheets.Color{
+		//						Red:   1.0,
+		//						Green: 1.0,
+		//						Blue:  1.0,
+		//					},
+		//					Bold:     true,
+		//					FontSize: 12,
+		//				},
+		//			},
+		//		},
+		//	},
+		//}
 
 		busr := &sheets.BatchUpdateSpreadsheetRequest{
 			Requests: []*sheets.Request{&rcreq},

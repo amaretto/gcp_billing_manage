@@ -3,16 +3,16 @@ package billing
 import sheets "google.golang.org/api/sheets/v4"
 
 // HEDDER_REQUEST() return request object that change reffered cell format
-func HEADER_REQUEST(shtId string, strtRwIdx, endRowIdx, strtClmnIdx, endClmnIdx int) sheets.Request {
+func HEADER_REQUEST(shtId string, strtRwIdx, endRwIdx, strtClmnIdx, endClmnIdx int) sheets.Request {
 	return sheets.Request{
 		RepeatCell: &sheets.RepeatCellRequest{
 			Fields: "*",
 			Range: &sheets.GridRange{
-				SheetId:          sheetID, // set sheet ID
-				StartRowIndex:    1,
-				EndRowIndex:      2,
-				StartColumnIndex: 1,
-				EndColumnIndex:   10,
+				SheetId:          sheetID,
+				StartRowIndex:    strtRwIdx,
+				EndRowIndex:      endRwIdx,
+				StartColumnIndex: strtClmnIdx,
+				EndColumnIndex:   endClmnIdx,
 			},
 			Cell: &sheets.CellData{
 				UserEnteredFormat: &sheets.CellFormat{
