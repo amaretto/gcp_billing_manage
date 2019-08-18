@@ -10,7 +10,7 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// GetBilling get billing info from bigquery
+// GetAllBilling get billing info from bigquery
 func GetAllBilling(ctx context.Context, projectID string) ([]Billing, error) {
 	client, err := bigquery.NewClient(ctx, projectID)
 	if err != nil {

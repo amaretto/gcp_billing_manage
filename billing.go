@@ -7,10 +7,10 @@ type Billing struct {
 	Total   float64
 }
 
-// Billing has billing info from bigquery
-type BillingService struct {
-	Month   string
-	Project string
-	Service string
-	Total   float64
-}
+// BillingService has billing info with service name from bigquery
+//type BillingService struct {
+//	Month   string
+//	Project string
+//	Service string
+//	Total   float64
+//}
