@@ -7,10 +7,12 @@ type Billing struct {
 	Total   float64
 }
 
-// BillingService has billing info with service name from bigquery
-//type BillingService struct {
-//	Month   string
-//	Project string
-//	Service string
-//	Total   float64
-//}
+// AmountWithService has billing info with service name from bigquery
+type AmountWithService struct {
+	Month   string
+	Project string
+	Service string
+	Total   float64
+}
+
+// ToDo : implement AmountWithSKU
