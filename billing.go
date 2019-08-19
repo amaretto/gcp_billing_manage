@@ -16,3 +16,10 @@ type AmountWithService struct {
 }
 
 // ToDo : implement AmountWithSKU
+type AmountWithSKU struct {
+	Month   string
+	Project string
+	Service string
+	SKU     string
+	Total   float64
+}
